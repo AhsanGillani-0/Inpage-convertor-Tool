@@ -145,6 +145,7 @@ button:active{transform:translateY(1px);}
 }
 .badge-color{background:rgba(251,191,36,.15);color:var(--amber);}
 .badge-img{background:rgba(110,168,255,.15);color:var(--accent);}
+.badge-warn{background:rgba(248,113,113,.15);color:var(--red);}
 
 .preview-box{
   background:#fbfaf7;
@@ -476,22 +477,25 @@ function extractTitle(bytes) {
   const starts = findAllStarts(bytes);
   if (!starts.length) return null;
   const firstStart = starts[0];
-  const windowStart = Math.max(0, firstStart - 12000);
+  const windowStart = Math.max(0, firstStart - 15000);
   try {
     const region = bytes.slice(windowStart, firstStart - 14);
     const text = applyMappingBytes(region, true);
-    const candidates = text.split(/[\u0000\r\n]+/);
-    let best = null;
-    for (const c0 of candidates) {
-      const c = c0.trim();
-      if (c.length < 3) continue;
-      if (/^[\u0600-\u06FF\s،۔!؟:.]+$/.test(c)) {
-        // prefer the longest matching candidate (titles are often the
-        // longest clean Urdu fragment in this metadata region)
-        if (!best || c.length > best.length) best = c;
-      }
-    }
-    return best;
+    const candidates = text.split(/[\u0000\r\n]+/).map(c => c.trim()).filter(c => c.length >= 2);
+
+    // Real headings in this metadata region are short, pure-Urdu
+    // fragments (no digits/Latin — those are dates/URLs/emails, not
+    // titles). We exclude very long unrelated announcement text and
+    // the Bismillah line (which usually duplicates the body's own
+    // first line rather than being an actual heading), then take the
+    // LAST such fragment — titles sit closest to the body start.
+    const qualifying = candidates.filter(c => {
+      if (c.length < 3 || c.length > 80) return false;
+      if (!/^[\u0600-\u06FF\s،۔!؟:.]+$/.test(c)) return false;
+      if (/^بسم\s*اللہ/.test(c)) return false;
+      return true;
+    });
+    return qualifying.length ? qualifying[qualifying.length - 1] : null;
   } catch (e) { return null; }
 }
 
@@ -950,6 +954,7 @@ convertBtn.addEventListener('click', async () => {
 
       const elements = buildElements(fullText);
       let txtContent = renderTxt(elements);
+      const isLowText = elements.length === 1 && elements[0][0] === 'flagged';
 
       // Embedded images (extracted silently, no clutter in the txt)
       let imgs = [];
@@ -986,7 +991,7 @@ convertBtn.addEventListener('click', async () => {
 
       convertedResults.push({
         name: baseName + '.txt', rawText: finalTxt, elements,
-        colors, imgInfo
+        colors, imgInfo, isLowText, hasTitle: !!title
       });
       if (colors.length) coloredFiles.push({ name: file.name, colors });
       ok++;
@@ -1047,6 +1052,8 @@ function renderFileList() {
     let badges = '';
     if (item.colors && item.colors.length) badges += `<span class="badge badge-color">🎨 ${item.colors.join(', ')}</span>`;
     if (item.imgInfo) badges += `<span class="badge badge-img">🖼 ${item.imgInfo}</span>`;
+    if (item.isLowText) badges += `<span class="badge badge-warn">⚠ Bahut kam text — mostly image ho sakti hai</span>`;
+    if (!item.hasTitle) badges += `<span class="badge badge-warn">⚠ Heading nahi mili — khud check karein</span>`;
     div.innerHTML = `<span class="fname">${item.name}${badges}</span><span class="fsize">${item.rawText.length} chars</span>`;
     div.addEventListener('click', () => {
       document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
