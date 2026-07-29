@@ -797,50 +797,11 @@ function buildElements(rawText) {
   if (strippedLen < 40) {
     return [['flagged', `Bahut kam text mila (${strippedLen} chars) — file shayad mostly images se bani ho. Original file check karein.`]];
   }
+  // No table-building — just plain paragraphs, in original order,
+  // so serial numbers and text stay exactly as extracted.
   const blocks = rawText.split('\r\n\r\n');
-  const n = blocks.length;
-  const lineCounts = blocks.map(b => b.split('\r\n').filter(l => l.trim()).length);
-  const runs = [];
-  let i = 0;
-  while (i < n) {
-    const cnt = lineCounts[i];
-    if (cnt >= 2 && cnt <= 10) {
-      let j = i;
-      while (j + 1 < n && lineCounts[j + 1] === cnt) j++;
-      if (j - i + 1 >= 3) {
-        let k = j;
-        while (k + 1 < n && blocks[k + 1].length < 100 && lineCounts[k + 1] >= 1) k++;
-        runs.push([i, k, cnt]);
-        i = k + 1; continue;
-      }
-    }
-    i++;
-  }
-  const tableRegion = {};
-  for (const [start, end, cols] of runs) {
-    const headerIdx = start - 1;
-    const hasHeader = headerIdx >= 0 && lineCounts[headerIdx] === cols;
-    const regionStart = hasHeader ? headerIdx : start;
-    for (let idx = regionStart; idx <= end; idx++) {
-      const lines = blocks[idx].split('\r\n').filter(l => l.trim());
-      if (lines.length === cols) {
-        tableRegion[idx] = [idx === headerIdx ? 'header' : 'row', lines];
-      } else {
-        tableRegion[idx] = ['flagged', lines.join(' / ')];
-      }
-    }
-  }
   const elements = [];
-  blocks.forEach((b, idx) => {
-    if (idx in tableRegion) {
-      const [kind, data] = tableRegion[idx];
-      if (kind === 'header') elements.push(['table_header', data]);
-      else if (kind === 'row') elements.push(['table_row', data]);
-      else elements.push(['flagged', data]);
-    } else if (b.trim()) {
-      elements.push(['para', b]);
-    }
-  });
+  blocks.forEach(b => { if (b.trim()) elements.push(['para', b]); });
   return elements;
 }
 
