@@ -256,18 +256,16 @@ footer{margin-top:36px;font-size:11.5px;color:var(--text-dim);text-align:center;
   <button class="btn-ghost btn-sm" id="retryBtn">↻ Failed files dobara try karein</button>
 
   <div class="preview-section" id="previewSection">
-    <div class="preview-heading" style="display:flex;justify-content:space-between;align-items:center;">
-      <span>Preview — file click karein:</span>
-      <button class="btn-ghost btn-sm" id="vkbToggle">⌨ Urdu Keyboard</button>
-    </div>
+    <div class="preview-heading">Preview — file click karein:</div>
     <div class="file-list" id="fileList"></div>
-    <div class="vkb" id="vkbPanel"></div>
     <div class="preview-box" id="previewBox" contenteditable="true" spellcheck="false"></div>
-    <div class="btn-row">
+    <div class="btn-row" style="margin-bottom:10px;">
       <span class="copy-feedback" id="copyFeedback">✓ Copied!</span>
       <button class="btn-ghost btn-sm" id="copyBtn">📋 Text Copy karein</button>
       <button class="btn-ghost btn-sm" id="dlSingleBtn">⬇ Is file ki TXT Download</button>
+      <button class="btn-ghost btn-sm" id="vkbToggle">⌨ Urdu Keyboard</button>
     </div>
+    <div class="vkb" id="vkbPanel"></div>
   </div>
 </div>
 
@@ -1106,21 +1104,32 @@ dlSingleBtn.addEventListener('click', () => {
 
 // ---------------------------------------------------------------
 // Simple on-screen Urdu keyboard — inserts characters at cursor
-// position inside the editable preview box.
+// position inside the editable preview box. Laid out in the exact
+// physical QWERTY shape (like the CRULP/Navees Urdu Phonetic
+// keyboard, which is what InPage-trained typists are used to), so
+// each button sits where the matching key would be on a real
+// keyboard. Base level only (no Shift/AltGr) for simplicity.
 // ---------------------------------------------------------------
 const VKB_ROWS = [
-  ['ق','و','ع','ر','ت','ے','ء','ی','ُ','ِ','ّ',' ⌫ '],
-  ['ا','س','د','ف','گ','ھ','ج','ک','ل',' ⏎ '],
-  ['ز','ح','ط','چ','پ','ب','ن','م',',','۔'],
-  ['ٹ','ص','ث','ق','ف','غ','ع','ه','خ','ح','ج']
+  ['۱','۲','۳','۴','۵','۶','۷','۸','۹','۰',' ⌫ '],
+  ['ق','و','ع','ر','ت','ے','ء','ی','ہ','پ'],
+  ['ا','س','د','ف','گ','ح','ج','ک','ل',' ⏎ '],
+  ['ز','ش','چ','ط','ب','ن','م','،','۔'],
 ];
-const VKB_EXTRA = ['ں','ذ','ژ','ش','ض','ظ','ك','ڈ','ڑ','آ','أ','ؤ','ئ','،','؟','؛','٭','﷼','۱','۲','۳','۴','۵','۶','۷','۸','۹','۰'];
+const VKB_HARKAT = ['َ','ِ','ُ','ّ','ٰ','ئ','ؤ','آ','أ','ھ'];
+const VKB_PUNCT_NUM = ['؛','؟','٭','﷼'];
 
 function buildVkb() {
   const panel = document.getElementById('vkbPanel');
   panel.innerHTML = '';
-  const rows = VKB_ROWS.concat([VKB_EXTRA]);
-  rows.forEach(row => {
+
+  const addLabel = (text) => {
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin:6px 2px 2px;text-align:center;';
+    lbl.textContent = text;
+    panel.appendChild(lbl);
+  };
+  const addRow = (row) => {
     const rowDiv = document.createElement('div');
     rowDiv.className = 'vkb-row';
     row.forEach(ch => {
@@ -1131,11 +1140,18 @@ function buildVkb() {
       else if (trimmed === '⏎') { btn.className = 'vkb-key wide'; btn.textContent = '⏎ Enter'; }
       else { btn.className = 'vkb-key'; btn.textContent = ch; }
       btn.addEventListener('mousedown', (e) => e.preventDefault()); // keep focus/selection in preview box
-      btn.addEventListener('click', () => vkbInsert(ch.trim()));
+      btn.addEventListener('click', () => vkbInsert(trimmed));
       rowDiv.appendChild(btn);
     });
     panel.appendChild(rowDiv);
-  });
+  };
+
+  addLabel('Huroof (alphabet order)');
+  VKB_ROWS.forEach(addRow);
+  addLabel('Harkaat / Hamza forms');
+  addRow(VKB_HARKAT);
+  addLabel('Punctuation / Numbers / Enter · Backspace');
+  addRow(VKB_PUNCT_NUM);
 }
 
 function vkbInsert(key) {
